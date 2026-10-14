@@ -6,13 +6,17 @@ package dev.droidtop.notices
  * and danger keep their hue, and danger stays apart from caution under the three simulated dichromacies.
  */
 object NoticeChecks {
-    /** Every text-on-surface pair below [floor]. */
+    /**
+     * Every text-on-surface pair below [floor]. A surface no colour at all reaches the floor on (neither black nor
+     * white does: a mid-tone ground under the 7:1 high-contrast floor) is not held to it.
+     */
     fun unreadable(c: NoticeInputs, n: NoticeColors, floor: Double): List<String> = buildList {
         val m = ColorMath
         val surfaces = listOf(c.ground, c.overlaySurface, c.card)
         fun check(name: String, fg: Int, bgs: List<Int>) = bgs.forEach { bg ->
             val r = m.ratio(fg, bg)
-            if (r < floor - 0.01) add("$name is $r:1 on ${Integer.toHexString(bg)} (floor $floor)")
+            val reachable = maxOf(m.ratio(m.BLACK, bg), m.ratio(m.WHITE, bg)) >= floor
+            if (r < floor - 0.01 && reachable) add("$name is $r:1 on ${Integer.toHexString(bg)} (floor $floor)")
         }
         check("info ink", n.infoInk, surfaces + n.infoPlate)
         check("caution ink", n.cautionInk, surfaces + n.cautionPlate)
