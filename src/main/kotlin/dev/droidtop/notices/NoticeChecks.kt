@@ -7,16 +7,20 @@ package dev.droidtop.notices
  */
 object NoticeChecks {
     /**
-     * Every text-on-surface pair below [floor]. A surface no colour at all reaches the floor on (neither black nor
-     * white does: a mid-tone ground under the 7:1 high-contrast floor) is not held to it.
+     * Every text-on-surface pair below [floor]. A colour is drawn on all the surfaces listed with it at once, so it
+     * is held to the floor only where one colour could reach it on all of them; where none could (a mid-tone ground
+     * under the 7:1 high-contrast floor, or a #707070 ground with #808080 cards, on which black reads 4.2:1 and white
+     * 3.9:1 on one of the two), the derivation's best is the answer.
      */
     fun unreadable(c: NoticeInputs, n: NoticeColors, floor: Double): List<String> = buildList {
         val m = ColorMath
         val surfaces = listOf(c.ground, c.overlaySurface, c.card)
-        fun check(name: String, fg: Int, bgs: List<Int>) = bgs.forEach { bg ->
-            val r = m.ratio(fg, bg)
-            val reachable = maxOf(m.ratio(m.BLACK, bg), m.ratio(m.WHITE, bg)) >= floor
-            if (r < floor - 0.01 && reachable) add("$name is $r:1 on ${Integer.toHexString(bg)} (floor $floor)")
+        fun check(name: String, fg: Int, bgs: List<Int>) {
+            if (!reachable(bgs, floor)) return
+            bgs.forEach { bg ->
+                val r = m.ratio(fg, bg)
+                if (r < floor - 0.01) add("$name is $r:1 on ${Integer.toHexString(bg)} (floor $floor)")
+            }
         }
         check("info ink", n.infoInk, surfaces + n.infoPlate)
         check("caution ink", n.cautionInk, surfaces + n.cautionPlate)
@@ -28,6 +32,12 @@ object NoticeChecks {
         check("muted", n.muted, listOf(n.infoPlate, n.cautionPlate, n.dangerPlate))
         // The plates are opaque: what is measured is what is drawn.
         listOf(n.infoPlate, n.cautionPlate, n.dangerPlate).forEach { if (m.alpha(it) != 0xFF) add("a plate is not opaque") }
+    }
+
+    /** Whether one colour reads at [floor] on every one of [backgrounds]: contrast depends only on luminance, so a grey stands for every colour. */
+    fun reachable(backgrounds: List<Int>, floor: Double): Boolean = (0..255).any { v ->
+        val grey = (0xFF shl 24) or (v shl 16) or (v shl 8) or v
+        backgrounds.all { ColorMath.ratio(grey, it) >= floor }
     }
 
     /** Caution or danger whose hue moved (more than [tolerance] degrees, where the lightness leaves a hue to keep). */
